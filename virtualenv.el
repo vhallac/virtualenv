@@ -49,6 +49,9 @@
 (defvar virtualenv-active nil
   "The current active virtual environment or nil")
 
+(defvar virtualenv-activate-history nil
+  "The history list for virtualenv-activate inputs")
+
 (defconst virtualenv-default-interpreter python-python-command)
 (defconst virtualenv-default-interpreter-args python-python-command-args)
 
@@ -78,10 +81,24 @@
   (virtualenv-set-interpreter virtualenv)
   (python-toggle-shells 'cpython)
   (setq virtualenv-active virtualenv)
+  (setenv "PYMACS_PYTHON" (concat virtualenv "/bin/python"))
   (run-hook-with-args virtualenv-postactivate-hook virtualenv))
 
 (defun virtualenv-activate (env)
-  (interactive "sName of environment to activate: ")
+  (interactive
+   (list 
+    (concat "/" 
+            (let ((reader (if (functionp 'ido-completing-read)
+                              'ido-completing-read
+                            completing-read)))
+              (funcall reader
+               "Name of environment to activate: "
+               (map 'list (lambda (x) (file-name-nondirectory x))
+                    (reduce (lambda (x y) 
+                              (if (file-directory-p y)
+                                  (cons y x)))
+                            (directory-files virtualenv-root-dir t) :initial-value '()))
+             nil t nil 'virtualenv-activate-history)))))
   (virtualenv-activate-environment (concat virtualenv-root-dir env)))
 
 (defun virtualenv-deactivate-environment ()
@@ -89,6 +106,7 @@
     (setq virtualenv-active nil)
     (virtualenv-set-interpreter nil)
     (python-toggle-shells 'cpython)
+    (setenv "PYMACS_PYTHON" nil)
     (run-hook-with-args virtualenv-postdeactivate-hook virtualenv-current-env)))
 
 (defun virtualenv-deactivate ()
